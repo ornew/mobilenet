@@ -14,11 +14,11 @@ This program was implemented with reference to the following papers.
 from collections import namedtuple
 import tensorflow as tf
 
-Convolution = namedtuple('Convolution', ['kernel_size', 'filters', 'strides', 'activation'])
+Convolution = namedtuple('Convolution', ['kernel_size', 'filters', 'strides'])
 Bottleneck  = namedtuple('Bottleneck',  ['expantion_rate', 'filters', 'strides'])
 
 MOBILENET_V2_LAYERS = [
-    Convolution(3,   32, 2, tf.nn.relu6),
+    Convolution(3,   32, 2),
     Bottleneck( 1,   16, 1),
     Bottleneck( 6,   24, 2),
     Bottleneck( 6,   24, 1),
@@ -36,7 +36,7 @@ MOBILENET_V2_LAYERS = [
     Bottleneck( 6,  160, 1),
     Bottleneck( 6,  160, 1),
     Bottleneck( 6,  320, 1),
-    Convolution(1, 1280, 1, None),
+    Convolution(1, 1280, 1),
 ]
 
 def _get_channel(tensor):
@@ -80,13 +80,13 @@ def _pointwise_conv2d_layer(inputs, filters, is_training, activation=None):
 def inverted_bottleneck_layer(inputs, expantion_rate, filters, stride, is_training):
     with tf.variable_scope(None, 'inverted_bottleneck_layer', [inputs]):
         x = inputs
-        x = _expansion_conv2d_layer(x, expantion_rate, is_training, activation=tf.nn.relu6)
-        x = _depthwise_conv2d_layer(x, stride        , is_training, activation=tf.nn.relu6)
-        x = _pointwise_conv2d_layer(x, filters       , is_training, activation=None)
-        tf.logging.debug('{} {}'.format(filters, x.shape))
-        if stride == 1:
+        if expantion_rate > 1:
+            x = _expansion_conv2d_layer(x, expantion_rate, is_training, activation=tf.nn.relu6)
+        x = _depthwise_conv2d_layer(x, stride , is_training, activation=tf.nn.relu6)
+        x = _pointwise_conv2d_layer(x, filters, is_training, activation=None)
+        
+        if stride == 1 and _get_channel(inputs) == _get_channel(x):
             x = tf.add(inputs, x) # residual connection.
-        tf.logging.debug(x.shape)
         return x
 
 def mobilenet(inputs, is_training, scope=None):
@@ -100,8 +100,7 @@ def mobilenet(inputs, is_training, scope=None):
                     x = tf.layers.conv2d(
                         x, l.filters, l.kernel_size, l.strides, 'SAME', use_bias=False)
                     x = tf.layers.batch_normalization(x, training=is_training)
-                    if l.activation:
-                        x = l.activation(x)
+                    x = tf.nn.relu6(x)
                     
                 elif isinstance(l, Bottleneck):
                     x = inverted_bottleneck_layer(
