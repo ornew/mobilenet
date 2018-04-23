@@ -94,7 +94,7 @@ def expanded_separable_convolution2d(inputs, filters, stride, expantion_rate, is
             x = _expansion_conv2d_layer(x, expantion_rate, is_training, activation=tf.nn.relu6)
         x = _depthwise_conv2d_layer(x, stride , is_training, activation=tf.nn.relu6)
         x = _pointwise_conv2d_layer(x, filters, is_training, activation=None)
-        
+
         if stride == 1 and _get_channel(inputs) == _get_channel(x):
             x = tf.add(inputs, x) # residual connection.
         return x
@@ -106,13 +106,13 @@ def mobilenet(inputs, is_training, multiplier=None, scope=None):
             with tf.variable_scope('hidden_layer_{}'.format(i)):
                 num_outputs = _multiple(l.filters, multiplier, 8) \
                     if multiplier is not None else l.filters
-                
+
                 if isinstance(l, Convolution):
                     x = tf.layers.conv2d(
                         x, num_outputs, l.kernel_size, l.strides, 'SAME', use_bias=False)
                     x = tf.layers.batch_normalization(x, training=is_training)
                     x = tf.nn.relu6(x)
-                    
+
                 elif isinstance(l, ExpandedSeparableConvolution):
                     x = expanded_separable_convolution2d(
                         x, num_outputs, l.strides, l.expantion_rate, is_training)
