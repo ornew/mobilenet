@@ -21,6 +21,7 @@ ExpSepConv = ExpandedSeparableConvolution = namedtuple(
     'ExpandedSeparableConvolution',
     ['expantion_rate', 'filters', 'strides'])
 
+# pylint: disable=bad-continuation
 MOBILENET_V2_LAYERS = [
           Conv(3,   32, 2),
     ExpSepConv(1,   16, 1),
@@ -87,6 +88,8 @@ def _pointwise_conv2d_layer(inputs, filters, is_training, activation=None):
         return x
 
 def expanded_separable_convolution2d(inputs, filters, stride, expantion_rate, is_training):
+    """Expanded Separable Convolution2d Layer
+    """
     with tf.variable_scope(None, 'expanded_separable_convolution2d_layer', [inputs]):
         x = inputs
         assert expantion_rate >= 1
@@ -100,6 +103,8 @@ def expanded_separable_convolution2d(inputs, filters, stride, expantion_rate, is
         return x
 
 def mobilenet(inputs, is_training, multiplier=None, scope=None):
+    """Embedding Feature by MobileNet v2
+    """
     with tf.variable_scope(scope, 'mobilenet_v2', [inputs]):
         x = inputs
         for i, l in enumerate(MOBILENET_V2_LAYERS):
@@ -121,7 +126,11 @@ def mobilenet(inputs, is_training, multiplier=None, scope=None):
                 i, x.get_shape().as_list()))
         return x
 
-def classify(inputs, num_classes, is_training, multiplier=None, dropout_keep_prob=0.999, scope=None):
+def classify(
+        inputs, num_classes, is_training, multiplier=None,
+        dropout_keep_prob=0.999, scope=None):
+    """MobileNet v2 Classification
+    """
     with tf.variable_scope(scope, 'mobilenet_v2_classify', [inputs]):
         x = mobilenet(inputs, is_training, multiplier=multiplier)
         x = tf.reduce_mean(x, [1, 2], keepdims=True, name='global_average_pooling')
