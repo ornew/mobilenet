@@ -93,8 +93,7 @@ def mobilenet(inputs, is_training, scope=None):
     with tf.variable_scope(scope, 'mobilenet_v2', [inputs]):
         x = inputs
         for i, l in enumerate(MOBILENET_V2_LAYERS):
-            layer_name = 'hidden_layer_{}'.format(i)
-            with tf.variable_scope(layer_name):
+            with tf.variable_scope('hidden_layer_{}'.format(i)):
                 
                 if isinstance(l, Convolution):
                     x = tf.layers.conv2d(
@@ -106,8 +105,8 @@ def mobilenet(inputs, is_training, scope=None):
                     x = inverted_bottleneck_layer(
                         x, l.expantion_rate, l.filters, l.strides, is_training)
 
-            tf.logging.debug('mobilenet_v2: {}: output_shape={}'.format(
-                layer_name, x.get_shape().as_list()))
+            tf.logging.debug('mobilenet_v2.hidden_layer.{:02}: output_shape={}'.format(
+                i, x.get_shape().as_list()))
         return x
 
 def classify(inputs, num_classes, is_training, dropout_keep_prob=0.999, scope=None):
