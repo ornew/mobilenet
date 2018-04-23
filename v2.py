@@ -14,29 +14,33 @@ This program was implemented with reference to the following papers.
 from collections import namedtuple
 import tensorflow as tf
 
-Convolution = namedtuple('Convolution', ['kernel_size', 'filters', 'strides'])
-Bottleneck  = namedtuple('Bottleneck',  ['expantion_rate', 'filters', 'strides'])
+Conv = Convolution = namedtuple(
+    'Convolution',
+    ['kernel_size', 'filters', 'strides'])
+ExpSepConv = ExpandedSeparableConvolution = namedtuple(
+    'ExpandedSeparableConvolution',
+    ['expantion_rate', 'filters', 'strides'])
 
 MOBILENET_V2_LAYERS = [
-    Convolution(3,   32, 2),
-    Bottleneck( 1,   16, 1),
-    Bottleneck( 6,   24, 2),
-    Bottleneck( 6,   24, 1),
-    Bottleneck( 6,   32, 2),
-    Bottleneck( 6,   32, 1),
-    Bottleneck( 6,   32, 1),
-    Bottleneck( 6,   64, 2),
-    Bottleneck( 6,   64, 1),
-    Bottleneck( 6,   64, 1),
-    Bottleneck( 6,   64, 1),
-    Bottleneck( 6,   96, 1),
-    Bottleneck( 6,   96, 1),
-    Bottleneck( 6,   96, 1),
-    Bottleneck( 6,  160, 2),
-    Bottleneck( 6,  160, 1),
-    Bottleneck( 6,  160, 1),
-    Bottleneck( 6,  320, 1),
-    Convolution(1, 1280, 1),
+          Conv(3,   32, 2),
+    ExpSepConv(1,   16, 1),
+    ExpSepConv(6,   24, 2),
+    ExpSepConv(6,   24, 1),
+    ExpSepConv(6,   32, 2),
+    ExpSepConv(6,   32, 1),
+    ExpSepConv(6,   32, 1),
+    ExpSepConv(6,   64, 2),
+    ExpSepConv(6,   64, 1),
+    ExpSepConv(6,   64, 1),
+    ExpSepConv(6,   64, 1),
+    ExpSepConv(6,   96, 1),
+    ExpSepConv(6,   96, 1),
+    ExpSepConv(6,   96, 1),
+    ExpSepConv(6,  160, 2),
+    ExpSepConv(6,  160, 1),
+    ExpSepConv(6,  160, 1),
+    ExpSepConv(6,  320, 1),
+          Conv(1, 1280, 1),
 ]
 
 def _get_channel(tensor):
@@ -82,8 +86,8 @@ def _pointwise_conv2d_layer(inputs, filters, is_training, activation=None):
             x = activation(x)
         return x
 
-def inverted_bottleneck_layer(inputs, expantion_rate, filters, stride, is_training):
-    with tf.variable_scope(None, 'inverted_bottleneck_layer', [inputs]):
+def expanded_separable_convolution2d(inputs, filters, stride, expantion_rate, is_training):
+    with tf.variable_scope(None, 'expanded_separable_convolution2d_layer', [inputs]):
         x = inputs
         assert expantion_rate >= 1
         if expantion_rate > 1:
@@ -109,15 +113,15 @@ def mobilenet(inputs, is_training, multiplier=None, scope=None):
                     x = tf.layers.batch_normalization(x, training=is_training)
                     x = tf.nn.relu6(x)
                     
-                elif isinstance(l, Bottleneck):
-                    x = inverted_bottleneck_layer(
-                        x, l.expantion_rate, num_outputs, l.strides, is_training)
+                elif isinstance(l, ExpandedSeparableConvolution):
+                    x = expanded_separable_convolution2d(
+                        x, num_outputs, l.strides, l.expantion_rate, is_training)
 
             tf.logging.debug('mobilenet_v2.hidden_layer.{:02}: output_shape={}'.format(
                 i, x.get_shape().as_list()))
         return x
 
-def classify(inputs, num_classes, is_training,, multiplier=None, dropout_keep_prob=0.999, scope=None):
+def classify(inputs, num_classes, is_training, multiplier=None, dropout_keep_prob=0.999, scope=None):
     with tf.variable_scope(scope, 'mobilenet_v2_classify', [inputs]):
         x = mobilenet(inputs, is_training, multiplier=multiplier)
         x = tf.reduce_mean(x, [1, 2], keepdims=True, name='global_average_pooling')
