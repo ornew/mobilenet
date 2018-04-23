@@ -21,9 +21,8 @@ ExpSepConv = ExpandedSeparableConvolution = namedtuple(
     'ExpandedSeparableConvolution',
     ['expantion_rate', 'filters', 'strides'])
 
-# pylint: disable=bad-continuation
 MOBILENET_V2_LAYERS = [
-          Conv(3,   32, 2),
+    Conv      (3,   32, 2),
     ExpSepConv(1,   16, 1),
     ExpSepConv(6,   24, 2),
     ExpSepConv(6,   24, 1),
@@ -41,7 +40,7 @@ MOBILENET_V2_LAYERS = [
     ExpSepConv(6,  160, 1),
     ExpSepConv(6,  160, 1),
     ExpSepConv(6,  320, 1),
-          Conv(1, 1280, 1),
+    Conv      (1, 1280, 1),
 ]
 
 def _get_channel(tensor):
