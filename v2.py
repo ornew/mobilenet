@@ -45,6 +45,11 @@ def _get_channel(tensor):
     assert channel is not None
     return channel
 
+def _multiple(value, multipler, divisor):
+    assert multipler > 0
+    assert divisor > 0
+    return max(divisor, (value * multipler + divisor / 2) // divisor * divisor)
+
 def _expansion_conv2d_layer(inputs, expantion_rate, is_training, activation=None):
     channel = _get_channel(inputs)
     num_outputs = int(expantion_rate * channel)
@@ -90,31 +95,32 @@ def inverted_bottleneck_layer(inputs, expantion_rate, filters, stride, is_traini
             x = tf.add(inputs, x) # residual connection.
         return x
 
-def mobilenet(inputs, is_training, scope=None):
+def mobilenet(inputs, is_training, multiplier=None, scope=None):
     with tf.variable_scope(scope, 'mobilenet_v2', [inputs]):
         x = inputs
         for i, l in enumerate(MOBILENET_V2_LAYERS):
             with tf.variable_scope('hidden_layer_{}'.format(i)):
+                num_outputs = _multiple(l.filters, multiplier, 8) \
+                    if multiplier is not None else l.filters
                 
                 if isinstance(l, Convolution):
                     x = tf.layers.conv2d(
-                        x, l.filters, l.kernel_size, l.strides, 'SAME', use_bias=False)
+                        x, num_outputs, l.kernel_size, l.strides, 'SAME', use_bias=False)
                     x = tf.layers.batch_normalization(x, training=is_training)
                     x = tf.nn.relu6(x)
                     
                 elif isinstance(l, Bottleneck):
                     x = inverted_bottleneck_layer(
-                        x, l.expantion_rate, l.filters, l.strides, is_training)
+                        x, l.expantion_rate, num_outputs, l.strides, is_training)
 
             tf.logging.debug('mobilenet_v2.hidden_layer.{:02}: output_shape={}'.format(
                 i, x.get_shape().as_list()))
         return x
 
-def classify(inputs, num_classes, is_training, dropout_keep_prob=0.999, scope=None):
+def classify(inputs, num_classes, is_training,, multiplier=None, dropout_keep_prob=0.999, scope=None):
     with tf.variable_scope(scope, 'mobilenet_v2_classify', [inputs]):
-        x = mobilenet(inputs, is_training)
+        x = mobilenet(inputs, is_training, multiplier=multiplier)
         x = tf.reduce_mean(x, [1, 2], keepdims=True, name='global_average_pooling')
-        assert x.get_shape().as_list() == [None, 1, 1, 1280]
         x = tf.layers.dropout(x, rate=dropout_keep_prob, training=is_training)
         x = tf.layers.conv2d(x, num_classes, 1, name='readout')
         x = tf.squeeze(x, [1, 2])
