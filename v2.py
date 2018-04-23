@@ -14,11 +14,11 @@ This program was implemented with reference to the following papers.
 from collections import namedtuple
 import tensorflow as tf
 
-Convolution = namedtuple('Convolution', ['kernel_size', 'filters', 'strides'])
+Convolution = namedtuple('Convolution', ['kernel_size', 'filters', 'strides', 'activation'])
 Bottleneck  = namedtuple('Bottleneck',  ['expantion_rate', 'filters', 'strides'])
 
 MOBILENET_V2_LAYERS = [
-    Convolution(3,   32, 2),
+    Convolution(3,   32, 2, tf.nn.relu6),
     Bottleneck( 1,   16, 1),
     Bottleneck( 6,   24, 2),
     Bottleneck( 6,   24, 1),
@@ -36,7 +36,7 @@ MOBILENET_V2_LAYERS = [
     Bottleneck( 6,  160, 1),
     Bottleneck( 6,  160, 1),
     Bottleneck( 6,  320, 1),
-    Convolution(1, 1280, 1),
+    Convolution(1, 1280, 1, None),
 ]
 
 def _get_channel(tensor):
@@ -48,8 +48,8 @@ def _get_channel(tensor):
 def _expansion_conv2d_layer(inputs, expantion_rate, is_training, activation=None):
     channel = _get_channel(inputs)
     num_outputs = int(expantion_rate * channel)
-    with tf.variable_scope(scope, 'expansion_conv2d_layer', [inputs]):
-        x = tf.layers.conv2d(inputs, num_outputs, 1, 'same', use_bias=False)
+    with tf.variable_scope(None, 'expansion_conv2d_layer', [inputs]):
+        x = tf.layers.conv2d(inputs, num_outputs, 1, 1, 'SAME', use_bias=False)
         x = tf.layers.batch_normalization(x, training=is_training)
         if activation:
             x = activation(x)
@@ -60,31 +60,33 @@ def _depthwise_conv2d_layer(inputs, stride, is_training, depth_multiplier=1, act
     dtype = inputs.dtype.base_dtype
     shape = [3, 3, channel, depth_multiplier]
     strides = [1, stride, stride, 1]
-    with tf.variable_scope(scope, 'depthwise_conv2d_layer', [inputs]):
+    with tf.variable_scope(None, 'depthwise_conv2d_layer', [inputs]):
         kernel = tf.get_variable('kernel', shape=shape, dtype=dtype)
         x = tf.nn.depthwise_conv2d(
-            inputs, kernel, strides, 'same', data_format='NHWC')
+            inputs, kernel, strides, 'SAME', data_format='NHWC')
         x = tf.layers.batch_normalization(x, training=is_training)
         if activation:
             x = activation(x)
         return x
 
 def _pointwise_conv2d_layer(inputs, filters, is_training, activation=None):
-    with tf.variable_scope(scope, 'depthwise_conv2d_layer', [inputs]):
-        x = tf.layers.conv2d(inputs, filters, 1, 'same', use_bias=False)
+    with tf.variable_scope(None, 'pointwise_conv2d_layer', [inputs]):
+        x = tf.layers.conv2d(inputs, filters, 1, 1, 'SAME', use_bias=False)
         x = tf.layers.batch_normalization(x, training=is_training)
         if activation:
             x = activation(x)
         return x
 
-def inverted_bottleneck_layer(inputs, expantion_rate, filters, stride, is_training, scope=None):
-    with tf.variable_scope(scope, 'inverted_bottleneck_layer', [inputs]):
+def inverted_bottleneck_layer(inputs, expantion_rate, filters, stride, is_training):
+    with tf.variable_scope(None, 'inverted_bottleneck_layer', [inputs]):
         x = inputs
-        x = _expansion_conv2d_layer(x, expantion_rate, activation=tf.nn.relu6)
-        x = _depthwise_conv2d_layer(x, stride        , activation=tf.nn.relu6)
-        x = _pointwise_conv2d_layer(x, filters       , activation=None)
+        x = _expansion_conv2d_layer(x, expantion_rate, is_training, activation=tf.nn.relu6)
+        x = _depthwise_conv2d_layer(x, stride        , is_training, activation=tf.nn.relu6)
+        x = _pointwise_conv2d_layer(x, filters       , is_training, activation=None)
+        tf.logging.debug('{} {}'.format(filters, x.shape))
         if stride == 1:
             x = tf.add(inputs, x) # residual connection.
+        tf.logging.debug(x.shape)
         return x
 
 def mobilenet(inputs, is_training, scope=None):
@@ -96,8 +98,10 @@ def mobilenet(inputs, is_training, scope=None):
                 
                 if isinstance(l, Convolution):
                     x = tf.layers.conv2d(
-                        x, l.filters, l.kernel_size, l.strides, 'same', use_bias=False)
+                        x, l.filters, l.kernel_size, l.strides, 'SAME', use_bias=False)
                     x = tf.layers.batch_normalization(x, training=is_training)
+                    if l.activation:
+                        x = l.activation(x)
                     
                 elif isinstance(l, Bottleneck):
                     x = inverted_bottleneck_layer(
