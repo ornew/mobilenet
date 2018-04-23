@@ -92,7 +92,7 @@ def expanded_separable_convolution2d(inputs, filters, stride, expantion_rate, is
         assert expantion_rate >= 1
         if expantion_rate > 1:
             x = _expansion_conv2d_layer(x, expantion_rate, is_training, activation=tf.nn.relu6)
-        x = _depthwise_conv2d_layer(x, stride , is_training, activation=tf.nn.relu6)
+        x = _depthwise_conv2d_layer(x, stride,  is_training, activation=tf.nn.relu6)
         x = _pointwise_conv2d_layer(x, filters, is_training, activation=None)
         
         if stride == 1 and _get_channel(inputs) == _get_channel(x):
@@ -121,7 +121,7 @@ def mobilenet(inputs, is_training, multiplier=None, scope=None):
                 i, x.get_shape().as_list()))
         return x
 
-def classify(inputs, num_classes, is_training, multiplier=None, dropout_keep_prob=0.999, scope=None):
+def classify(inputs, num_classes, is_training, multiplier=None, dropout_keep_prob=0.8, scope=None):
     with tf.variable_scope(scope, 'mobilenet_v2_classify', [inputs]):
         x = mobilenet(inputs, is_training, multiplier=multiplier)
         x = tf.reduce_mean(x, [1, 2], keepdims=True, name='global_average_pooling')
