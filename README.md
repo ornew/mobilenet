@@ -7,7 +7,7 @@ Implementation MobileNet(current v2 only) by TensorFlow.
 from mobilenet.v2 as mobilenet_v2
 ```
 
-This implementation was implemented with reference to the following papers.
+This program was implemented with reference to the following papers.
 
 MobileNet v2:
 
