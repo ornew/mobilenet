@@ -80,6 +80,7 @@ def _pointwise_conv2d_layer(inputs, filters, is_training, activation=None):
 def inverted_bottleneck_layer(inputs, expantion_rate, filters, stride, is_training):
     with tf.variable_scope(None, 'inverted_bottleneck_layer', [inputs]):
         x = inputs
+        assert expantion_rate >= 1
         if expantion_rate > 1:
             x = _expansion_conv2d_layer(x, expantion_rate, is_training, activation=tf.nn.relu6)
         x = _depthwise_conv2d_layer(x, stride , is_training, activation=tf.nn.relu6)
