@@ -22,7 +22,7 @@ ExpSepConv = ExpandedSeparableConvolution = namedtuple(
     ['expantion_rate', 'filters', 'strides'])
 
 MOBILENET_V2_LAYERS = [
-          Conv(3,   32, 2),
+    Conv      (3,   32, 2),
     ExpSepConv(1,   16, 1),
     ExpSepConv(6,   24, 2),
     ExpSepConv(6,   24, 1),
@@ -40,7 +40,7 @@ MOBILENET_V2_LAYERS = [
     ExpSepConv(6,  160, 1),
     ExpSepConv(6,  160, 1),
     ExpSepConv(6,  320, 1),
-          Conv(1, 1280, 1),
+    Conv      (1, 1280, 1),
 ]
 
 def _get_channel(tensor):
@@ -87,6 +87,8 @@ def _pointwise_conv2d_layer(inputs, filters, is_training, activation=None):
         return x
 
 def expanded_separable_convolution2d(inputs, filters, stride, expantion_rate, is_training):
+    """Expanded Separable Convolution2d Layer
+    """
     with tf.variable_scope(None, 'expanded_separable_convolution2d_layer', [inputs]):
         x = inputs
         assert expantion_rate >= 1
@@ -94,25 +96,27 @@ def expanded_separable_convolution2d(inputs, filters, stride, expantion_rate, is
             x = _expansion_conv2d_layer(x, expantion_rate, is_training, activation=tf.nn.relu6)
         x = _depthwise_conv2d_layer(x, stride,  is_training, activation=tf.nn.relu6)
         x = _pointwise_conv2d_layer(x, filters, is_training, activation=None)
-        
+
         if stride == 1 and _get_channel(inputs) == _get_channel(x):
             x = tf.add(inputs, x) # residual connection.
         return x
 
 def mobilenet(inputs, is_training, multiplier=None, scope=None):
+    """Embedding Feature by MobileNet v2
+    """
     with tf.variable_scope(scope, 'mobilenet_v2', [inputs]):
         x = inputs
         for i, l in enumerate(MOBILENET_V2_LAYERS):
             with tf.variable_scope('hidden_layer_{}'.format(i)):
                 num_outputs = _multiple(l.filters, multiplier, 8) \
                     if multiplier is not None else l.filters
-                
+
                 if isinstance(l, Convolution):
                     x = tf.layers.conv2d(
                         x, num_outputs, l.kernel_size, l.strides, 'SAME', use_bias=False)
                     x = tf.layers.batch_normalization(x, training=is_training)
                     x = tf.nn.relu6(x)
-                    
+
                 elif isinstance(l, ExpandedSeparableConvolution):
                     x = expanded_separable_convolution2d(
                         x, num_outputs, l.strides, l.expantion_rate, is_training)
@@ -121,11 +125,15 @@ def mobilenet(inputs, is_training, multiplier=None, scope=None):
                 i, x.get_shape().as_list()))
         return x
 
-def classify(inputs, num_classes, is_training, multiplier=None, dropout_keep_prob=0.8, scope=None):
+def classify(
+        inputs, num_classes, is_training, multiplier=None,
+        dropout_rate=0.8, scope=None):
+    """MobileNet v2 Classification
+    """
     with tf.variable_scope(scope, 'mobilenet_v2_classify', [inputs]):
         x = mobilenet(inputs, is_training, multiplier=multiplier)
         x = tf.reduce_mean(x, [1, 2], keepdims=True, name='global_average_pooling')
-        x = tf.layers.dropout(x, rate=dropout_keep_prob, training=is_training)
+        x = tf.layers.dropout(x, rate=dropout_rate, training=is_training)
         x = tf.layers.conv2d(x, num_classes, 1, name='readout')
         x = tf.squeeze(x, [1, 2])
         assert x.get_shape().as_list() == [None, num_classes]
